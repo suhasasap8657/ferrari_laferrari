@@ -18,13 +18,12 @@ export function useSmoothScroll() {
     }
 
     const lenis = new Lenis({
-      duration: isMobile ? 0.8 : 1.2,
+      duration: isMobile ? 0.9 : 1.3,
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       orientation: 'vertical',
       gestureOrientation: 'vertical',
       smoothWheel: true,
       wheelMultiplier: 0.9,
-      // Use native touch physics on mobile/touch screens (ZERO input lag)
       touchMultiplier: 1.0,
       syncTouch: false,
       infinite: false,
@@ -60,8 +59,6 @@ export function scrollToId(id: string, offset = 0) {
 
 export function stopScroll(stopped: boolean) {
   const lenis = getLenis()
-  if (lenis) {
-    stopped ? lenis.stop() : lenis.start()
-  }
+  if (lenis) stopped ? lenis.stop() : lenis.start()
   document.documentElement.style.overflow = stopped && !lenis ? 'hidden' : ''
 }
