@@ -6,7 +6,6 @@ import { EngineStart } from './EngineStart'
 const FRAME_COUNT = 1030
 const frameUrl = (n: number) => `/media/frames/frame_${String(n).padStart(4, '0')}.webp`
 
-/** Three captions. */
 const CHAPTERS = [
   { at: 0.22, index: '01', label: 'Silhouette' },
   { at: 0.5, index: '02', label: 'Powertrain' },
@@ -26,10 +25,12 @@ export function ScrollSequence() {
   const engineStartRef = useRef<HTMLDivElement>(null)
   const captionRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // Cache dimensions to avoid reading layout on every frame
+  // Dimensions & Physics
   const dims = useRef({ width: 0, height: 0, dpr: 1 })
   const painted = useRef(-1)
   const playhead = useRef(1)
+  const targetPlayhead = useRef(1)
+  const lastTime = useRef(performance.now())
   const [lowPower, setLowPower] = useState(false)
 
   useEffect(() => {
@@ -43,14 +44,14 @@ export function ScrollSequence() {
     startAt: 1,
     url: frameUrl,
     stride,
-    coarseStep: lowPower ? 18 : 10,
+    coarseStep: lowPower ? 16 : 10,
     concurrency: lowPower ? 6 : 10,
   })
 
   const seqRef = useRef(seq)
   seqRef.current = seq
 
-  /** Update cached canvas dimensions on resize only */
+  /** Update cached canvas dimensions on resize */
   const resizeCanvas = () => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -96,12 +97,14 @@ export function ScrollSequence() {
       ctx.fillRect(0, 0, cw, ch)
     }
 
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(src, (cw - dw) * 0.5, (ch - dh) * 0.5, dw, dh)
     painted.current = sample.number
   }
 
-  /* ── Unified Single rAF Loop: zero layout thrashing, zero React re-renders ── */
-  useAnimationFrame(() => {
+  /* ── Liquid-smooth Physics Loop with Delta-time compensation ── */
+  useAnimationFrame((time) => {
     const track = trackRef.current
     if (!track || document.hidden) return
 
@@ -112,17 +115,23 @@ export function ScrollSequence() {
 
     const scrollable = rect.height - vh
     const p = scrollable > 0 ? clamp01(-rect.top / scrollable) : 0
-    const target = 1 + p * (FRAME_COUNT - 1)
+    targetPlayhead.current = 1 + p * (FRAME_COUNT - 1)
 
-    // Smooth playhead chase
-    const delta = target - playhead.current
-    playhead.current += Math.abs(delta) < 0.2 ? delta : delta * 0.45
+    // Calculate time delta for framerate independence (60Hz / 120Hz / 144Hz)
+    const now = performance.now()
+    const dt = Math.min((now - lastTime.current) / 1000, 0.1)
+    lastTime.current = now
+
+    // Liquid friction dampener: 0.10 gives an ultra-smooth luxury glide
+    const friction = 1 - Math.exp(-12 * dt)
+    playhead.current += (targetPlayhead.current - playhead.current) * friction
+
     const currentFrame = Math.round(playhead.current)
 
-    // 1. Draw canvas
+    // 1. Draw canvas frame
     draw(playhead.current)
 
-    // 2. Update HUD directly via DOM (Zero React lag)
+    // 2. Direct DOM HUD update (Zero React lag)
     if (hudFrameRef.current) {
       hudFrameRef.current.textContent = String(currentFrame).padStart(4, '0')
     }
@@ -130,7 +139,7 @@ export function ScrollSequence() {
       hudBarRef.current.style.transform = `scaleX(${p})`
     }
 
-    // 3. Update Captions directly (Eliminated 3 separate rAF loops)
+    // 3. Caption opacity transitions
     const half = 0.13
     for (let i = 0; i < CHAPTERS.length; i++) {
       const el = captionRefs.current[i]
@@ -149,11 +158,11 @@ export function ScrollSequence() {
           el.style.visibility = 'visible'
         }
         el.style.opacity = opacity.toFixed(3)
-        el.style.transform = `translate3d(0, ${((p - chapter.at) * 60).toFixed(1)}px, 0)`
+        el.style.transform = `translate3d(0, ${((p - chapter.at) * 45).toFixed(1)}px, 0)`
       }
     }
 
-    // 4. Update EngineStart visibility (frames 380 - 455)
+    // 4. Engine button visibility
     if (engineStartRef.current) {
       const isVisible = currentFrame >= 380 && currentFrame <= 455
       engineStartRef.current.style.opacity = isVisible ? '1' : '0'
@@ -161,7 +170,6 @@ export function ScrollSequence() {
     }
   })
 
-  // Repaint on fine frames decoding & on resize
   useEffect(() => {
     return seq.onDecode(() => {
       painted.current = -1
@@ -177,7 +185,8 @@ export function ScrollSequence() {
 
   return (
     <section id="sequence" className="relative bg-canvas">
-      <div ref={trackRef} className="relative h-[320vh] md:h-[420vh]">
+      {/* 450vh gives the scrollbar room to breathe so every frame feels cinematic */}
+      <div ref={trackRef} className="relative h-[380vh] md:h-[480vh]">
         <div className="sticky top-0 h-[100svh] w-full overflow-hidden">
           <canvas ref={canvasRef} className="h-full w-full" />
 
