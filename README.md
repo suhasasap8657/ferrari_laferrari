@@ -156,3 +156,4 @@ Swap the source frames by dropping new files in `public/media/frames/` as
   **Inter at weight 500** as the open-source substitute, which is what ships here
   (`@fontsource-variable/inter`, self-hosted — no external font CDN).
 - If you intend to make this public, add your own attribution/notice and keep the footer disclaimer.
+# ferrari_laferrari
