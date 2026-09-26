@@ -1,5 +1,5 @@
 import { useAnimationFrame } from 'framer-motion'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useFrameSequence } from '../lib/useFrameSequence'
 import { EngineStart } from './EngineStart'
 
@@ -19,55 +19,43 @@ export function ScrollSequence() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null)
 
-  // Direct DOM refs to eliminate React re-renders during scroll
   const hudFrameRef = useRef<HTMLSpanElement>(null)
   const hudBarRef = useRef<HTMLDivElement>(null)
   const engineStartRef = useRef<HTMLDivElement>(null)
   const captionRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // Dimensions & Physics
-  const dims = useRef({ width: 0, height: 0, dpr: 1 })
+  const dims = useRef({ width: 0, height: 0 })
   const painted = useRef(-1)
   const playhead = useRef(1)
   const targetPlayhead = useRef(1)
   const lastTime = useRef(performance.now())
-  const [lowPower, setLowPower] = useState(false)
 
-  useEffect(() => {
-    const cores = navigator.hardwareConcurrency ?? 4
-    setLowPower(window.matchMedia('(max-width: 860px)').matches || cores <= 4)
-  }, [])
-
-  const stride: 1 | 2 = lowPower ? 2 : 1
   const seq = useFrameSequence({
     count: FRAME_COUNT,
     startAt: 1,
     url: frameUrl,
-    stride,
-    coarseStep: lowPower ? 16 : 10,
-    concurrency: lowPower ? 6 : 10,
   })
 
   const seqRef = useRef(seq)
   seqRef.current = seq
 
-  /** Update cached canvas dimensions on resize */
+  /** Clamps DPR strictly: Max 1.0 on mobile, Max 1.25 on desktop */
   const resizeCanvas = () => {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const isMobile = window.innerWidth <= 860
+    const dpr = isMobile ? 1.0 : Math.min(window.devicePixelRatio || 1, 1.25)
     const w = Math.round(canvas.clientWidth * dpr)
     const h = Math.round(canvas.clientHeight * dpr)
 
-    dims.current = { width: w, height: h, dpr }
+    dims.current = { width: w, height: h }
     canvas.width = w
     canvas.height = h
     painted.current = -1
     draw(playhead.current, true)
   }
 
-  /** Cover-fit blit directly to GPU buffer */
   const draw = (frameNumber: number, force = false) => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -97,41 +85,34 @@ export function ScrollSequence() {
       ctx.fillRect(0, 0, cw, ch)
     }
 
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(src, (cw - dw) * 0.5, (ch - dh) * 0.5, dw, dh)
     painted.current = sample.number
   }
 
-  /* ── Liquid-smooth Physics Loop with Delta-time compensation ── */
-  useAnimationFrame((time) => {
+  useAnimationFrame(() => {
     const track = trackRef.current
     if (!track || document.hidden) return
 
     const rect = track.getBoundingClientRect()
     const vh = window.innerHeight
-    // Cull entirely when out of viewport
     if (rect.bottom < -80 || rect.top > vh + 80) return
 
     const scrollable = rect.height - vh
     const p = scrollable > 0 ? clamp01(-rect.top / scrollable) : 0
     targetPlayhead.current = 1 + p * (FRAME_COUNT - 1)
 
-    // Calculate time delta for framerate independence (60Hz / 120Hz / 144Hz)
     const now = performance.now()
     const dt = Math.min((now - lastTime.current) / 1000, 0.1)
     lastTime.current = now
 
-    // Liquid friction dampener: 0.10 gives an ultra-smooth luxury glide
-    const friction = 1 - Math.exp(-12 * dt)
+    // Responsive glide physics
+    const friction = 1 - Math.exp(-14 * dt)
     playhead.current += (targetPlayhead.current - playhead.current) * friction
 
     const currentFrame = Math.round(playhead.current)
 
-    // 1. Draw canvas frame
     draw(playhead.current)
 
-    // 2. Direct DOM HUD update (Zero React lag)
     if (hudFrameRef.current) {
       hudFrameRef.current.textContent = String(currentFrame).padStart(4, '0')
     }
@@ -139,7 +120,6 @@ export function ScrollSequence() {
       hudBarRef.current.style.transform = `scaleX(${p})`
     }
 
-    // 3. Caption opacity transitions
     const half = 0.13
     for (let i = 0; i < CHAPTERS.length; i++) {
       const el = captionRefs.current[i]
@@ -157,12 +137,11 @@ export function ScrollSequence() {
         if (el.style.visibility !== 'visible') {
           el.style.visibility = 'visible'
         }
-        el.style.opacity = opacity.toFixed(3)
-        el.style.transform = `translate3d(0, ${((p - chapter.at) * 45).toFixed(1)}px, 0)`
+        el.style.opacity = opacity.toFixed(2)
+        el.style.transform = `translate3d(0, ${((p - chapter.at) * 40).toFixed(1)}px, 0)`
       }
     }
 
-    // 4. Engine button visibility
     if (engineStartRef.current) {
       const isVisible = currentFrame >= 380 && currentFrame <= 455
       engineStartRef.current.style.opacity = isVisible ? '1' : '0'
@@ -185,16 +164,13 @@ export function ScrollSequence() {
 
   return (
     <section id="sequence" className="relative bg-canvas">
-      {/* 450vh gives the scrollbar room to breathe so every frame feels cinematic */}
-      <div ref={trackRef} className="relative h-[380vh] md:h-[480vh]">
+      <div ref={trackRef} className="relative h-[360vh] md:h-[460vh]">
         <div className="sticky top-0 h-[100svh] w-full overflow-hidden">
           <canvas ref={canvasRef} className="h-full w-full" />
 
-          {/* Depth scrims */}
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(24,24,24,0.82)_0%,rgba(24,24,24,0.05)_22%,rgba(24,24,24,0.05)_70%,rgba(24,24,24,0.88)_100%)]" />
           <div className="film-grain pointer-events-none absolute inset-0 opacity-[0.08] mix-blend-overlay" />
 
-          {/* Captions */}
           <div className="pointer-events-none absolute inset-0">
             <div className="shell flex h-full items-end pb-24 md:pb-28">
               <div className="relative w-full max-w-[560px]">
@@ -218,7 +194,6 @@ export function ScrollSequence() {
             </div>
           </div>
 
-          {/* Engine zoom */}
           <div
             ref={engineStartRef}
             className="transition-opacity duration-300"
@@ -227,7 +202,6 @@ export function ScrollSequence() {
             <EngineStart visible={true} />
           </div>
 
-          {/* Bottom rail: counter + sequence progress */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0">
             <div className="shell pb-7">
               <div className="mb-4 flex items-center justify-between">
