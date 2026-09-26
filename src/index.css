@@ -1,0 +1,175 @@
+@import '@fontsource-variable/inter/index.css';
+
+/* Ferrari's own brand face (Regular 400 / Medium 500), self-hosted. */
+@font-face {
+  font-family: 'FerrariSans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/FerrariSans-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'FerrariSans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/FerrariSans-Medium.woff2') format('woff2');
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Base — Ferrari DESIGN token surfaces
+   ───────────────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --canvas: #181818;
+    --canvas-elevated: #303030;
+    --primary: #da291c;
+    --ink: #ffffff;
+    --body: #969696;
+    --hairline: #303030;
+    --ease-ferrari: cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  html {
+    /* Lenis drives the scroll — keep the browser from fighting it */
+    scroll-behavior: auto;
+    background-color: var(--canvas);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    margin: 0;
+    overflow-x: hidden;
+    font-weight: 400;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Lenis */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid #f6e500;
+    outline-offset: 2px;
+  }
+
+  /* Slim dark scrollbar to preserve the cinematic frame */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #101010;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #3a3a3a;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+  }
+}
+
+@layer components {
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  .shell {
+    @apply mx-auto w-full max-w-[1280px] px-6 md:px-12;
+  }
+  .band {
+    @apply py-24 md:py-[96px];
+  }
+  .hairline {
+    @apply border-t border-hairline;
+  }
+
+  /* ── Buttons — sharp 0px corners, uppercase 1.4px tracking ──────────── */
+  .btn {
+    @apply relative inline-flex h-12 items-center justify-center gap-3 overflow-hidden px-8
+           text-button uppercase transition-colors duration-300 ease-ferrari;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-white;
+  }
+  .btn-primary:hover {
+    @apply bg-primary-active;
+  }
+  .btn-outline {
+    @apply btn border border-white/70 bg-transparent text-white;
+  }
+  .btn-outline:hover {
+    @apply border-white bg-white text-body-on-light;
+  }
+  .btn-ghost {
+    @apply text-button inline-flex items-center gap-3 uppercase text-white/80 transition-colors hover:text-white;
+  }
+  /* sweeping fill used on the primary CTA */
+  .btn-fill::after {
+    content: '';
+    @apply absolute inset-0 -z-0 origin-left scale-x-0 bg-black/15 transition-transform duration-500 ease-ferrari;
+  }
+  .btn-fill:hover::after {
+    @apply scale-x-100;
+  }
+
+  .eyebrow {
+    @apply text-caption-up uppercase tracking-[1.1px] text-body;
+  }
+  .rule {
+    @apply h-px w-full bg-hairline;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  /* Photographic vignette used over cinematic imagery */
+  .vignette::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 90% at 50% 45%, transparent 45%, rgba(0, 0, 0, 0.55) 100%),
+      linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, transparent 28%, transparent 62%, rgba(24, 24, 24, 0.95) 100%);
+  }
+  .film-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
